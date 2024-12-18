@@ -1,145 +1,5 @@
-import os
+from cuerpo_finito import G_F
 import random
-
-class G_F:
-    def __init__(self, Polinomio_Irreducible=0x177):
-        '''
-        Inicializa el cuerpo finito usando un polinomio irreducible dado y un generador g = 3.
-        
-        Entrada:
-        - Polinomio_Irreducible: entero que representa el polinomio irreducible para generar el cuerpo.
-        
-        Crea las tablas Tabla_EXP y Tabla_LOG que permiten realizar operaciones de multiplicación e inversos 
-        de manera eficiente con g = 3 como generador del cuerpo.
-        '''
-        self.Polinomio_Irreducible = Polinomio_Irreducible
-        self.Tabla_EXP = [0] * 256
-        self.Tabla_LOG = [0] * 256 
-
-        self.Tabla_EXP[0] = 1
-        self.Tabla_LOG[1] = 0
-        self.Tabla_LOG[0] = 255
-        
-        found = False
-        g = 2
-        while not found:
-            i = 1
-            res = g
-            while i < 255 and res != 1:
-                self.Tabla_EXP[i] = res
-                self.Tabla_LOG[self.Tabla_EXP[i]] = i
-                res = self.producto_polinomios(res, g)
-                i += 1
-                
-            if i == 255: 
-                found = True
-            else:
-                g += 1
-                
-        self.Tabla_EXP[255] = self.Tabla_EXP[0]
-        print(f"Generador del cuerpo finito: {g}")
-        
-    def print_tables(self):
-        '''
-        Funcion auxiliar que muestra el resultado de las tablas EXP y LOG
-        '''
-        print("Tabla_EXP:")
-        for i in range(0, 256, 16):
-            print(" ".join(f"{x:02x}" for x in self.Tabla_EXP[i:i+16]))
-
-        print("\nTabla_LOG:")
-        for i in range(0, 256, 16):
-            print(" ".join(f"{x:02x}" for x in self.Tabla_LOG[i:i+16]))
-        
-    def producto_polinomios(self, a, b):
-        '''
-        Multiplica dos polinomios en GF(2^8) y los reduce usando el polinomio irreducible.
-        
-        Entrada:
-        - a: entero que representa el primer polinomio.
-        - b: entero que representa el segundo polinomio.
-        
-        Salida:
-        - El producto de a y b reducido por el polinomio irreducible.
-        '''
-        result = 0
-        while b > 0:
-            if b & 1:
-                result ^= a
-            a <<= 1
-            if a & 0x100:
-                a ^= self.Polinomio_Irreducible
-            b >>= 1
-        return result & 0xFF
-        
-    def division(self, a, b):
-        '''
-        Calcula la división de dos elementos en el cuerpo finito GF(2^8) usando las tablas EXP y LOG.
-        
-        Entrada:
-        - a: entero entre 0 y 255.
-        - b: entero entre 0 y 255.
-        
-        Salida:
-        - El cociente de a y b en GF(2^8).
-        '''
-        if a == 0:
-            return 0
-        if b == 0:
-            raise ZeroDivisionError("No se puede dividir por 0.")
-
-        log_a = self.Tabla_LOG[a]
-        log_b = self.Tabla_LOG[b]
-        log_result = (log_a - log_b) % 255
-        return self.Tabla_EXP[log_result]
-
-    def xTimes(self, n):
-        '''
-        Multiplica el elemento n por 0x02 en el cuerpo finito GF(2^8).
-        
-        Entrada:
-        - n: entero entre 0 y 255 que representa un elemento del cuerpo.
-        
-        Salida:
-        - Un entero entre 0 y 255 que es el producto de n por 0x02 en el cuerpo.
-        '''
-        result = n << 1
-        if result & 0x100:
-            result ^= self.Polinomio_Irreducible
-        return result & 0xFF
-
-    def producto(self, a, b):
-        '''
-        Calcula el producto de dos elementos en el cuerpo finito GF(2^8) usando las tablas EXP y LOG.
-        
-        Entrada:
-        - a: entero entre 0 y 255.
-        - b: entero entre 0 y 255.
-        
-        Salida:
-        - El producto de a y b en GF(2^8).
-        '''
-        if a == 0 or b == 0:
-            return 0
-        
-        return self.Tabla_EXP[(self.Tabla_LOG[a] + self.Tabla_LOG[b]) % 255]
-
-    def inverso(self, n):
-        '''
-        Calcula el inverso multiplicativo de un elemento en el cuerpo finito GF(2^8).
-        
-        Entrada:
-        - n: entero entre 0 y 255 que representa un elemento del cuerpo.
-        
-        Salida:
-        - 0 si n es 0.
-        - El inverso multiplicativo de n si n es diferente de 0.
-        '''
-        if n == 0:
-            return 0
-        
-        return self.Tabla_EXP[255 - self.Tabla_LOG[n]]
-
 
 class AES:
     def __init__(self, key, Polinomio_Irreducible):
@@ -332,9 +192,9 @@ class AES:
         5.1.4 ADDROUNDKEY()
         FIPS 197: Advanced Encryption Standard (AES)
         '''
-        for c in range(4):
-            for r in range(4):
-                State[c][r] ^= roundKey[c][r]
+        for r in range(4):
+            for c in range(4):
+                State[r][c] ^= roundKey[r][c]
         
     def SubWord(self, word):
         '''
@@ -513,21 +373,3 @@ class AES:
 
         with open(file + ".dec", "wb") as f:
             f.write(decrypted_data)
-            
-            
-def main():
-    key = bytearray.fromhex("016d10f93f4027c29b0f637bb782cf74")
-    polinomio_irreducible = 0x177
-    aes = AES(key, polinomio_irreducible)
-    
-    encrypted_file = "TextoCifrado.txt"
-    aes.decrypt_file(encrypted_file)
-    
-    decrypted_file = encrypted_file + ".dec"
-    with open(decrypted_file, "rb") as f:
-        decrypted_data = f.read()
-    
-    print(f"Longitud del texto original: {len(decrypted_data)}")
-
-if __name__ == "__main__":
-    main()
